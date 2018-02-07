@@ -2,6 +2,10 @@ import socket
 import json
 import time
 import sys
+import logging
+import log.log_config
+
+client_logger = logging.getLogger('client')
 
 presense_message = {
     'action': 'presense',

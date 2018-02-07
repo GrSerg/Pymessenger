@@ -2,6 +2,10 @@ import socket
 import json
 import time
 import sys
+import logging
+import log.log_config
+
+server_logger = logging.getLogger('server')
 
 response_message = {
     'response': 200,
