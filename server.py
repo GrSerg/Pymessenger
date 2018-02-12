@@ -5,50 +5,93 @@ import sys
 import logging
 from socket import *
 from log.log_config import *
+from JIM.protocol import *
 
 
 server_logger = logging.getLogger('server')
 log = Log(server_logger)
 
 
-response_message = {
-    'response': 200,
-    'time': time.time(),
-    'alert': 'OK'
-}
 
-@log
-def read_requests(r_clients, all_clients):
-    """Чтение запросов из списка клиентов"""
-    messages = []
-    for sock in r_clients:
-        try:
-            message = sock.recv(1024)
-            message = json.loads(message.decode())
-            messages.append(message)
-        except:
-            print('Клиент {} {} отключился'.format(sock.fileno(), sock.getpeername()))
-            all_clients.remove(sock)
-    return messages
+class Server:
+    """Базовый класс сервера мессенджера"""
+    def __init__(self, addr, port):
+        self.addr = addr
+        self.port = port
+
+        self.server = self.start()
+        # список клиентов
+        self.clients = []
 
 
-@log
-def write_responses(messages, w_clients, all_clients):
-    for sock in w_clients:
-        for message in messages:
+    def start(self):
+        server = socket(AF_INET, SOCK_STREAM)
+        server.bind((self.addr, self.port))
+        server.listen(15)
+        print('Сервер запущен!')
+        server.settimeout(0.2)
+        return server
+
+    @log
+    def read_requests(self, r_clients):
+        """Чтение запросов из списка клиентов"""
+        messages = []
+        for sock in r_clients:
             try:
-                message = json.dumps(message).encode()
-                sock.send(message)
+                bmessage = sock.recv(1024)
+                message = JimMessage.create_from_bytes(bmessage)
+                messages.append(message)
             except:
                 print('Клиент {} {} отключился'.format(sock.fileno(), sock.getpeername()))
-                sock.close()
-                all_clients.remove(sock)
+                self.clients.remove(sock)
+        return messages
 
 
-# def server_start():
-#     server_sock = socket(AF_INET, SOCK_STREAM)
+    @log
+    def write_responses(self, messages, w_clients):
+        for sock in w_clients:
+            for message in messages:
+                try:
+                    # message = json.dumps(message).encode()
+                    sock.send(bytes(message))
+                except: # Сокет недоступен, клиент отключился
+                    print('Клиент {} {} отключился'.format(sock.fileno(), sock.getpeername()))
+                    sock.close()
+                    self.clients.remove(sock)
 
-server = socket(AF_INET, SOCK_STREAM)
+
+    def get_connection(self):
+        try:
+            client, addr = self.server.accept()  # принятие запроса на соединение от клиента
+            client_presense_bytes = client.recv(1024)
+            client_presense_msg = JimMessage.create_from_bytes(client_presense_bytes)
+            if client_presense_msg.action == PRESENCE:
+                presense_response = JimResponse(RESPONSE=OK, time=time.time())
+                client.send(bytes(presense_response))
+            else:
+                presense_response = JimResponse(RESPONSE=WRONG_REQUEST, time=time.time())
+                client.send(bytes(presense_response))
+        except OSError as e:
+            pass  # таймаут вышел
+        else:
+            print('Получен запрос на соединение с %s' % str(addr))
+            self.clients.append(client)
+        finally:
+            # проверка наличия событий ввода-вывода
+            wait = 0
+            r = []
+            w = []
+            try:
+                r, w, e = select.select(self.clients, self.clients, [], wait)
+            except:
+                pass    # Ничего не делать, если какой-то клиент отключился
+
+            requests = self.read_requests(r)
+            self.write_responses(requests, w)
+
+    def mainloop(self):
+        while True:
+            self.get_connection()
 
 try:
     addr = sys.argv[1]
@@ -62,36 +105,6 @@ except ValueError:
     print('Порт должен быть целым числом')
     sys.exit(0)
 
-server.bind((addr, port))
-server.listen(15)
-print('Сервер запущен!')
-server.settimeout(0.2)
-clients = []
 
-while True:
-    try:
-        client, addr = server.accept()  # принятие запроса на соединение от клиента
-        client_presense = client.recv(1024)
-        client_presense = json.loads(client_presense.decode())
-        print(client_presense)
-        response = json.dumps(response_message).encode()  # отправка
-        client.send(response)
-    except OSError as e:
-        pass    # таймаут вышел
-    else:
-        print('Получен запрос на соединение с %s' % str(addr))
-        clients.append(client)
-    finally:
-        # проверка наличия событий ввода-вывода
-        wait = 0
-        r = []
-        w = []
-        try:
-            r, w, e = select.select(clients, clients, [], wait)
-        except:
-            pass
-
-        requests = read_requests(r, clients)
-        write_responses(requests, w, clients)
-
-
+serv = Server(addr, port)
+serv.mainloop()
