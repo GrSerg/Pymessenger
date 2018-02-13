@@ -66,10 +66,10 @@ class Server:
             client_presense_bytes = client.recv(1024)
             client_presense_msg = JimMessage.create_from_bytes(client_presense_bytes)
             if client_presense_msg.action == PRESENCE:
-                presense_response = JimResponse(RESPONSE=OK, time=time.time())
+                presense_response = JimResponse(response=OK, time=time.time())
                 client.send(bytes(presense_response))
             else:
-                presense_response = JimResponse(RESPONSE=WRONG_REQUEST, time=time.time())
+                presense_response = JimResponse(response=WRONG_REQUEST, time=time.time())
                 client.send(bytes(presense_response))
         except OSError as e:
             pass  # таймаут вышел
