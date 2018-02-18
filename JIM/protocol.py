@@ -1,28 +1,32 @@
 import json
+import time as ctime
 
-'''Константы для работы JIM протокола'''
+# Константы для работы JIM протокола
 
-# Возможные ключи в сообщениях от клиентов
-PRESENCE = 'presence'
-MSG = 'msg'
-QUIT = 'quit'
-
-# Кортеж возможных действий (будет дополняться)
-ACTIONS = (PRESENCE, MSG, QUIT)
-
-# Обязательные ключи в сообщениях от клиента
+# Ключи
 ACTION = 'action'
-TIME = 'time'
-
-# Кортеж из обязательных ключей для сообщений от клиента
-MANDATORY_MESSAGE_KEYS = (ACTION, TIME)
-
-# Обязательные ключи в ответах сервера
+USER = 'user'
+ACCOUNT_NAME ='account_name'
+USER_ID = 'user_id'
 RESPONSE = 'response'
 TIME = 'time'
+ERROR = 'error'
+ALERT = 'alert'
+QUANTITY = 'quantity'
 
-# Кортеж обязательных ключей в ответах от сервера
-MANDATORY_RESPONSE_KEYS = (RESPONSE, TIME)
+# Значения
+PRESENCE = 'presence'
+MSG = 'msg'
+TO = 'to'
+FROM = 'from'
+MESSAGE = 'message'
+GET_CONTACTS = 'get_contacts'
+CONTACT_LIST = 'contact_list'
+ADD_CONTACT = 'add_contact'
+DEL_CONTACT = 'del_contact'
+
+# Кортеж возможных действий
+ACTIONS = (PRESENCE, MSG, GET_CONTACTS, CONTACT_LIST, ADD_CONTACT, DEL_CONTACT)
 
 # Коды ответов (будут дополняться)
 BASIC_NOTICE = 100
@@ -35,91 +39,339 @@ SERVER_ERROR = 500
 RESPONSE_CODES = (BASIC_NOTICE, OK, ACCEPTED, WRONG_REQUEST, SERVER_ERROR)
 
 
-class MandatoryKeyError(Exception):
-    """Ошибка отсутствия обязательного ключа в сообщении"""
+USERNAME_MAX_LENGTH = 25
+MESSAGE_MAX_LENGTH = 500
 
-    def __init__(self, key):
-        """
-        :param key: обязательный ключ, которого нет в сообщении
-        """
-        self.key = key
+#############################
+# Функции для сообщений
+
+def dict_to_bytes(message_dict):
+    """Преобразование словаря в байты"""
+    # Проверям, что пришел словарь
+    if isinstance(message_dict, dict):
+        # Преобразуем словарь в json
+        jmessage = json.dumps(message_dict)
+        # Переводим json в байты
+        bmessage = jmessage.encode()
+        # Возвращаем байты
+        return bmessage
+    else:
+        raise TypeError
+
+def bytes_to_dict(message_bytes):
+    """Получение словаря из байтов"""
+    # Если переданы байты
+    if isinstance(message_bytes, bytes):
+        # Декодируем
+        jmessage = message_bytes.decode()
+        # Из json делаем словарь
+        message = json.loads(jmessage)
+        # Если там был словарь
+        if isinstance(message, dict):
+            # Возвращаем сообщение
+            return message
+        else:
+            # Нам прислали неверный тип
+            raise TypeError
+    else:
+        # Передан неверный тип
+        raise TypeError
+
+def send_message(sock, message):
+    """Отправка сообщения"""
+    # Словарь переводим в байты
+    bprescence = dict_to_bytes(message)
+    # Отправляем
+    sock.send(bprescence)
+
+def get_message(sock):
+    """Получение сообщения"""
+    # Получаем байты
+    bresponse = sock.recv(1024)
+    # переводим байты в словарь
+    response = bytes_to_dict(bresponse)
+    # возвращаем словарь
+    return response
+
+#############################
+# Ошибки
+
+class WrongInputError(Exception):
+    pass
+
+class WrongParamsError(WrongInputError):
+    """Неверные параметры для действия"""
+
+    def __init__(self, params):
+        self.params = params
 
     def __str__(self):
-        return 'Не хватает обязательного атрибута {}'.format(self.key)
+        return 'Неверные параметры действий: {}'.format(self.params)
+
+
+class WrongActionError(WrongInputError):
+    """Когда передано неверное действие"""
+
+    def __init__(self, action):
+        self.action = action
+
+    def __str__(self):
+        return 'Неверное действие: {}'.format(self.action)
+
+
+class WrongDictError(WrongInputError):
+    """Когда пришел неправильный словарь"""
+
+    def __init__(self, dict_name):
+        self.dict_name = dict_name
+
+    def __str__(self):
+        return 'Неправильный словарь: {}'.format(self.dict_name)
+
+
+class ToLongError(Exception):
+    """Ошибка, когда поле длиннее чем нужно"""
+
+    def __init__(self, name, value, max_length):
+        self.name = name
+        self.value = value
+        self.max_length = max_length
+
+    def __str__(self):
+        return '{}: {} длиннее чем (> {} символов)'.format(self.name, self.value, self.max_length)
 
 
 class ResponseCodeError(Exception):
-    """Ошибка неверный код ответа от сервера"""
-
+    """Ошибка, когда неверный код ответа сервера"""
     def __init__(self, code):
-        """
-        :param code: Неверный код ответа
-        """
         self.code = code
 
     def __str__(self):
-        return 'Неверный код ответа {}'.format(self.code)
+        return 'Неверный код ответа сервера: {}'.format(self.code)
+
+#####################################
+# Дескрипторы
 
 
-class ResponseCodeLenError(ResponseCodeError):
-    """Ошибка неверная длина кода ответа, должна быть 3 символа"""
+class MaxLengthField:
+    """Дескриптор ограничивающий размер поля"""
 
-    def __str__(self):
-        return 'Неверная длина кода {}. Длина кода должна быть 3 символа.'.format(self.code)
+    def __init__(self, name, max_length):
+        self.name = '_' + name
+        self.max_lenght = max_length
 
+    def __set__(self, instance, value):
+        # если длина поля больше максимального значения
+        if len(value) > self.max_lenght:
+            # вызываем ошибку
+            raise ToLongError(self.name, value, self.max_lenght)
+        # иначе записываем данные в поле
+        setattr(instance, self.name, value)
 
-class BaseJimMessage:
-    """Базовое сообщение для Jim протокола"""
-
-    def __init__(self, **kwargs):
-
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-
-    def __bytes__(self):
-        """Возможность приводить сообщение сразу в байты bytes(jim_message)"""
-        # Преобразуем в json
-        message_json = json.dumps(self.__dict__)
-        # Преобразуем в байты
-        message_bytes = message_json.encode()
-        return message_bytes
-
-    @classmethod
-    def create_from_bytes(cls, message_bytes):
-        """Возможность создавать сообщение по набору байт"""
-        # Байты в json
-        message_json = message_bytes.decode()
-        # json в словарь
-        message_dict = json.loads(message_json)
-        return cls(**message_dict)
-
-    def __str__(self):
-        return str(self.__dict__)
+    def __get__(self, instance, owner):
+        # получаем данные поля
+        return getattr(instance, self.name)
 
 
-class JimMessage(BaseJimMessage):
-    """Клиентское сообщение"""
+class ResponseField:
+    """Дескриптор правильных кодов ответов сервера"""
 
-    def __init__(self, **kwargs):
-        # проверки
-        if ACTION not in kwargs:
-            raise MandatoryKeyError(ACTION)
-        if TIME not in kwargs:
-            raise MandatoryKeyError(TIME)
-        super().__init__(**kwargs)
+    def __init__(self, name):
+        self.name = '_' + name
+
+    def __set__(self, instance, value):
+        # если значение кода не входит в список доступных кодов
+        if value not in RESPONSE_CODES:
+            # вызываем ошибку
+            raise ResponseCodeError(value)
+        # иначе записываем данные в поле
+        setattr(instance, self.name, value)
+
+    def __get__(self, instance, owner):
+        # получаем данные поля
+        return getattr(instance, self.name)
 
 
-class JimResponse(BaseJimMessage):
-    """Ответ сервера"""
-    def __init__(self, **kwargs):
-        # проверки
-        if RESPONSE not in kwargs:
-            raise MandatoryKeyError(RESPONSE)
-        if TIME not in kwargs:
-            raise MandatoryKeyError(TIME)
-        code = kwargs[RESPONSE]
-        if len(code) != 3:
-            raise ResponseCodeLenError(code)
-        if code not in RESPONSE_CODES:
-            raise ResponseCodeError(code)
-        super().__init__(**kwargs)
+############################
+# Классы протокола Jim
+
+class Jim:
+
+    def to_dict(self):
+        return {}
+
+    @staticmethod
+    def try_create(jim_class, input_dict):
+        try:
+            return jim_class(**input_dict)
+        except KeyError:
+            raise WrongParamsError(input_dict)
+
+    @staticmethod
+    def from_dict(input_dict):
+        """Наиболее важный метод создания объекта из входного словаря"""
+        # должно быть action или response
+        # если action
+        if ACTION in input_dict:
+            # достаем действие
+            action = input_dict.pop(ACTION)
+            # действие должно быть в списке действий
+            if action in ACTIONS:
+                if action == PRESENCE:
+                    return Jim.try_create(JimPresense, input_dict)
+                elif action == GET_CONTACTS:
+                    return Jim.try_create(JimGetContacts, input_dict)
+                elif action == CONTACT_LIST:
+                    return Jim.try_create(JimContactList, input_dict)
+                elif action == ADD_CONTACT:
+                    return Jim.try_create(JimAddContact, input_dict)
+                elif action == DEL_CONTACT:
+                    return Jim.try_create(JimDelContact, input_dict)
+                elif action == MSG:
+                    try:
+                        input_dict['from_'] = input_dict['from']
+                    except KeyError:
+                        raise WrongParamsError(input_dict)
+                    del input_dict['from']
+                    return Jim.try_create(JimMessage, input_dict)
+            else:
+                raise WrongActionError(action)
+        elif RESPONSE in input_dict:
+            return Jim.try_create(JimResponse, input_dict)
+        else:
+            raise WrongDictError(input_dict)
+
+
+class JimAction(Jim):
+
+    def __init__(self, action, time=None):
+        self.action = action
+        if time:
+            self.time = time
+        else:
+            self.time = ctime.time()
+
+    def to_dict(self):
+        result = super().to_dict()
+        result[ACTION] = self.action
+        result[TIME] = self.time
+        return result
+
+
+class JimAddContact(JimAction):
+    # Имя пользователя ограничено 25 символов - используем дескриптор
+    account_name = MaxLengthField('account_name', USERNAME_MAX_LENGTH)
+    # Имя пользователя ограничено 25 символов - используем дескриптор
+    user_id = MaxLengthField('user_id', USERNAME_MAX_LENGTH)
+
+    def __init__(self, account_name, user_id, time=None):
+        self.account_name = account_name
+        self.user_id = user_id
+        super().__init__(ADD_CONTACT, time)
+
+    def to_dict(self):
+        result = super().to_dict()
+        result[ACCOUNT_NAME] = self.account_name
+        result[USER_ID] = self.user_id
+        return result
+
+
+class JimDelContact(JimAction):
+    # Имя пользователя ограничено 25 символов - используем дескриптор
+    account_name = MaxLengthField('account_name', USERNAME_MAX_LENGTH)
+    # Имя пользователя ограничено 25 символов - используем дескриптор
+    user_id = MaxLengthField('user_id', USERNAME_MAX_LENGTH)
+
+    def __init__(self, account_name, user_id, time=None):
+        self.account_name = account_name
+        self.user_id = user_id
+        super().__init__(DEL_CONTACT, time)
+
+    def to_dict(self):
+        result = super().to_dict()
+        result[ACCOUNT_NAME] = self.account_name
+        result[USER_ID] = self.user_id
+        return result
+
+
+class JimContactList(JimAction):
+    # Имя пользователя ограничено 25 символов - используем дескриптор
+    user_id = MaxLengthField('user_id', USERNAME_MAX_LENGTH)
+
+    def __init__(self, user_id, time=None):
+        self.user_id = user_id
+        super().__init__(CONTACT_LIST, time)
+
+    def to_dict(self):
+        result = super().to_dict()
+        result[USER_ID] = self.user_id
+        return result
+
+
+class JimGetContacts(JimAction):
+    # Имя пользователя ограничено 25 символов - используем дескриптор
+    account_name = MaxLengthField('account_name', USERNAME_MAX_LENGTH)
+
+    def __init__(self, account_name, time=None):
+        self.account_name = account_name
+        super().__init__(GET_CONTACTS, time)
+
+    def to_dict(self):
+        result = super().to_dict()
+        result[ACCOUNT_NAME] = self.account_name
+        return result
+
+
+class JimPresense(JimAction):
+    # Имя пользователя ограничено 25 символов - используем дескриптор
+    account_name = MaxLengthField('account_name', USERNAME_MAX_LENGTH)
+
+    def __init__(self, account_name, time=None):
+        self.account_name = account_name
+        super().__init__(GET_CONTACTS, time)
+
+    def to_dict(self):
+        result = super().to_dict()
+        result[ACCOUNT_NAME] = self.account_name
+        return result
+
+
+class JimMessage(JimAction):
+    to = MaxLengthField('to', USERNAME_MAX_LENGTH)
+    from_ = MaxLengthField('from', USERNAME_MAX_LENGTH)
+    message = MaxLengthField('message', MESSAGE_MAX_LENGTH)
+
+    def __init__(self, to, from_, message, time=None):
+        self.to = to
+        self.from_ = from_
+        self.message = message
+        super().__init__(MSG, time=time)
+
+    def to_dict(self):
+        result = super().to_dict()
+        result[TO] = self.to
+        result[FROM] = self.from_
+        result[MESSAGE] = self.message
+        return result
+
+
+class JimResponse(Jim):
+    # Используем дескриптор для поля ответ от сервера
+    response = ResponseField('response')
+
+    def __init__(self, response, error=None, alert=None, quantity=None):
+        self.response = response
+        self.error = error
+        self.alert = alert
+        self.quantity = quantity
+
+    def to_dict(self):
+        result = super().to_dict()
+        result[RESPONSE] = self.response
+        if self.error is not None:
+            result[ERROR] = self.error
+        if self.alert is not None:
+            result[ALERT] = self.alert
+        if self.quantity is not None:
+            result[QUANTITY] = self.quantity
+        return result
