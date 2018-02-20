@@ -6,7 +6,7 @@ import time as ctime
 # Ключи
 ACTION = 'action'
 USER = 'user'
-ACCOUNT_NAME ='account_name'
+ACCOUNT_NAME = 'account_name'
 USER_ID = 'user_id'
 RESPONSE = 'response'
 TIME = 'time'
@@ -45,6 +45,7 @@ MESSAGE_MAX_LENGTH = 500
 #############################
 # Функции для сообщений
 
+
 def dict_to_bytes(message_dict):
     """Преобразование словаря в байты"""
     # Проверям, что пришел словарь
@@ -57,6 +58,7 @@ def dict_to_bytes(message_dict):
         return bmessage
     else:
         raise TypeError
+
 
 def bytes_to_dict(message_bytes):
     """Получение словаря из байтов"""
@@ -77,12 +79,14 @@ def bytes_to_dict(message_bytes):
         # Передан неверный тип
         raise TypeError
 
+
 def send_message(sock, message):
     """Отправка сообщения"""
     # Словарь переводим в байты
     bprescence = dict_to_bytes(message)
     # Отправляем
     sock.send(bprescence)
+
 
 def get_message(sock):
     """Получение сообщения"""
@@ -96,8 +100,10 @@ def get_message(sock):
 #############################
 # Ошибки
 
+
 class WrongInputError(Exception):
     pass
+
 
 class WrongParamsError(WrongInputError):
     """Неверные параметры для действия"""

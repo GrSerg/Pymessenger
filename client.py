@@ -1,8 +1,6 @@
-from socket import *
-import json
-import time
 import sys
 import logging
+from socket import *
 from log.log_config import *
 from JIM.protocol import *
 
@@ -23,51 +21,83 @@ class WrongModeError(Exception):
 class Client:
     """Клиент"""
 
-    def __init__(self, addr='localhost', port=7777, mode='r'):
-        self.addr = addr
-        self.port = port
-        self.mode = mode
-        self.client = self.connect()
-
-    def connect(self):
-        client_sock = socket(AF_INET, SOCK_STREAM)
-        client_sock.connect((self.addr, self.port))
-        return client_sock
+    def __init__(self, login='Guest'):
+        self.login = login
 
     @log
-    def mainloop(self):
-        # отправка presense сообщения
-        presense_message = JimMessage(action=PRESENCE, time=time.time())
-        self.client.send(bytes(presense_message))
+    def create_presense(self):
+        """Формирование presense сообщения"""
+        jim_presense = JimPresense(self.login)
+        message = jim_presense.to_dict()
+        return message
 
-        # получаем ответ в байтах
-        presense_response_bytes = self.client.recv(1024)
-        presense_response = JimMessage.create_from_bytes(presense_response_bytes)
-        # проверяем всё ли хорошо
-        if presense_response.response == OK:
-            # Всё ок
-            if self.mode == 'r':
-                print('Чтение')
-                while True:
-                    bmessage = self.client.recv(1024)
-                    jmessage = JimMessage.create_from_bytes(bmessage)
-                    print(jmessage.message)
-            elif self.mode == 'w':
-                # ждем ввода сообщения и шлем на сервер
-                message_str = input(':>')
-                msg = JimMessage(action=MSG, time=time.time(), message=message_str)
-                self.client.send(bytes(msg))
+    @log
+    def translate_response(self, response):
+        """Разбор ответа сервера"""
+        result = Jim.from_dict(response)
+        return result.to_dict()
+
+
+    def create_message(self, message_to, text):
+        """Создание сообщения"""
+        message = JimMessage(message_to, self.login, text)
+        return message.to_dict()
+
+    def read_messages(self, sock):
+        """Чтение сообщений в бесконечном цикле"""
+        while True:
+            print('Читаю')
+            message = get_message(sock)
+            print(message[MESSAGE])
+
+    def write_messages(self, sock):
+        """Клиент пишет сообщения в бесконечном цикле"""
+        while True:
+            text = input(':>')
+            if text.startswith('list'):
+                # запрос на список контактов
+                jimmessage = JimGetContacts(self.login)
+                send_message(sock,jimmessage.to_dict())
+                # получаем ответ
+                response = get_message(sock)
+                response = Jim.from_dict(response)
+                # количество контактов
+                quantity = response.quantity
+                print('У вас ', quantity, 'друзей')
+                # имена друзей по отдельности
+                print('Вот они:')
+                for i in range(quantity):
+                    message = get_message(sock)
+                    message = Jim.from_dict(message)
+                    print(message.user_id)
             else:
-                raise WrongModeError(self.mode)
-        elif presense_response.response == SERVER_ERROR:
-            print('Внутрення ошибка сервера')
-        elif presense_response.response == WRONG_REQUEST:
-            print('Неверный запрос на сервер')
-        else:
-            print('Неверный код ответа от сервера')
+                command, param = text.split()
+                if command == 'add':
+                    # будем добавлять контакт
+                    message = JimAddContact(self.login, param)
+                    send_message(sock, message.to_dict())
+                    # получаем ответ от сервера
+                    response = get_message(sock)
+                    response = Jim.from_dict(response)
+                    if response.response == ACCEPTED:
+                        print('Контакт {} успешно добавлен'.format(param))
+                    else:
+                        print(response.error)
+                elif command == 'del':
+                    # будем удалять контакт
+                    message = JimDelContact(self.login, param)
+                    send_message(sock, message.to_dict())
+                    # получаем ответ от сервера
+                    response = get_message(sock)
+                    response = Jim.from_dict(response)
+                    if response.response == ACCEPTED:
+                        print('Контакт {} успешно удален'.format(param))
+                    else:
+                        print(response.error)
 
 
 if __name__ == '__main__':
+    sock = socket(AF_INET, SOCK_STREAM)
 
     try:
         addr = sys.argv[1]
@@ -88,5 +118,20 @@ if __name__ == '__main__':
     except IndexError:
         mode = 'r'
 
-    client = Client(addr, port, mode)
-    client.mainloop()
+    sock.connect((addr, port))
+    # создаем пользователя
+    client = Client('Serg')
+    # отправляем presense сообщение
+    presense = client.create_presense()
+    send_message(sock, presense)
+    # получаем и проверяем ответ
+    response = get_message(sock)
+    response = client.translate_response(response)
+    if response == OK:
+        # в зависимости от режима мы будем или слушать или отправлять сообщения
+        if mode == 'r':
+            client.read_messages(sock)
+        elif mode == 'w':
+            client.write_messages(sock)
+        else:
+            raise WrongModeError
