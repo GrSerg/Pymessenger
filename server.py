@@ -1,76 +1,131 @@
-import json
-import time
 import select
 import sys
 import logging
 from socket import *
 from log.log_config import *
 from JIM.protocol import *
-
+from repo.server_models import session
+from repo.server_repo import Repo
+from repo.server_errors import ContactDoesNotExist
 
 server_logger = logging.getLogger('server')
 log = Log(server_logger)
 
 
-
-class Server:
-    """Базовый класс сервера мессенджера"""
-    def __init__(self, addr, port):
-        self.addr = addr
-        self.port = port
-
-        self.server = self.start()
-        # список клиентов
-        self.clients = []
-
-
-    def start(self):
-        server = socket(AF_INET, SOCK_STREAM)
-        server.bind((self.addr, self.port))
-        server.listen(15)
-        print('Сервер запущен!')
-        server.settimeout(0.2)
-        return server
+class Handler:
+    """Обработчик сообщений"""
+    def __init__(self):
+        self.repo = Repo(session)
 
     @log
-    def read_requests(self, r_clients):
+    def read_requests(self, r_clients, all_clients):
         """Чтение запросов из списка клиентов"""
+        # список входящих сообщений
         messages = []
         for sock in r_clients:
             try:
-                bmessage = sock.recv(1024)
-                message = JimMessage.create_from_bytes(bmessage)
+                message = get_message(sock)
                 messages.append(message)
             except:
                 print('Клиент {} {} отключился'.format(sock.fileno(), sock.getpeername()))
-                self.clients.remove(sock)
+                all_clients.remove(sock)
         return messages
 
-
     @log
-    def write_responses(self, messages, w_clients):
+    def write_responses(self, messages, w_clients, all_clients):
+        """Отправка сообщений клиентам"""
         for sock in w_clients:
+            # отправка сообщений всем
             for message in messages:
                 try:
-                    # message = json.dumps(message).encode()
-                    sock.send(bytes(message))
-                except: # Сокет недоступен, клиент отключился
+                    # теперь нам приходят разные сообщения, будем их обрабатывать
+                    action = Jim.from_dict(message)
+                    if action.action == GET_CONTACTS:
+                        # нам нужен репозиторий
+                        contacts = self.repo.get_contacts(action.account_name)
+                        response = JimResponse(ACCEPTED, quantity=len(contacts))
+                        send_message(sock, response.to_dict())
+                        # в цикле по контактам шлем сообщения
+                        for contact in contacts:
+                            message = JimContactList(contact.Name)
+                            print(message.to_dict())
+                            send_message(sock, message.to_dict())
+                    elif action.action == ADD_CONTACT:
+                        user_id = action.user_id
+                        username = action.account_name
+                        try:
+                            self.repo.add_contact(username, user_id)
+                            # шлем удачный ответ
+                            response = JimResponse(ACCEPTED)
+                            send_message(sock, response.to_dict())
+                        except ContactDoesNotExist as e:
+                            # формируем ошибку, такого контакта нет
+                            response = JimResponse(WRONG_REQUEST, error='Такого контакта нет')
+                            send_message(sock, response.to_dict())
+                    elif action.action == DEL_CONTACT:
+                        user_id = action.user_id
+                        username = action.account_name
+                        try:
+                            self.repo.del_contact(username, user_id)
+                            # шлем удачный ответ
+                            response = JimResponse(ACCEPTED)
+                            send_message(sock, response.to_dict())
+                        except ContactDoesNotExist as e:
+                            # формируем ошибку, такого контакта нет
+                            response = JimResponse(WRONG_REQUEST, error='Такого контакта нет')
+                            send_message(sock, response.to_dict())
+                except WrongInputError as e:
+                    # Отправляем ошибку и текст из ошибки
+                    response = JimResponse(WRONG_REQUEST, error=str(e))
+                    send_message(sock, response.to_dict())
+                except:  # Сокет недоступен, клиент отключился
                     print('Клиент {} {} отключился'.format(sock.fileno(), sock.getpeername()))
                     sock.close()
-                    self.clients.remove(sock)
+                    all_clients.remove(sock)
+
+    def presense_response(self, presence_message):
+        """Формирование ответа клиенту"""
+        try:
+            presense = Jim.from_dict(presence_message)
+            username = presense.account_name
+            # сохраняем пользователя в базу если его там еще нет
+            if not self.repo.client_exist(username):
+                self.repo.add_client(username)
+        except Exception as e:
+            # шлем код ошибки
+            response = JimResponse(WRONG_REQUEST, error=str(e))
+            return response.to_dict()
+        else:
+            # всё ок
+            response = JimResponse(OK)
+            return response.to_dict()
 
 
-    def get_connection(self):
+class Server:
+    """Класс сервера"""
+
+    def __init__(self, handler):
+
+        # обработчик событий
+        self.handler = handler
+        # список клиентов
+        self.clients = []
+        # сокет
+        self.server = socket(AF_INET, SOCK_STREAM)  # Создает сокет TCP
+
+    def bind(self, addr, port):
+        # запоминаем адрес и порт
+        self.server.bind((addr, port))
+
+    def listen_forever(self):
+        # запускаем цикл обработки событиц много клиентов
+        self.server.listen(15)
+        self.server.settimeout(0.2)
         try:
             client, addr = self.server.accept()  # принятие запроса на соединение от клиента
-            client_presense_bytes = client.recv(1024)
-            client_presense_msg = JimMessage.create_from_bytes(client_presense_bytes)
-            if client_presense_msg.action == PRESENCE:
-                presense_response = JimResponse(response=OK, time=time.time())
-                client.send(bytes(presense_response))
-            else:
-                presense_response = JimResponse(response=WRONG_REQUEST, time=time.time())
-                client.send(bytes(presense_response))
+            presense = get_message(client)
+            response = self.handler.presense_response(presense)
+            send_message(client, response)
         except OSError as e:
             pass  # таймаут вышел
         else:
@@ -86,25 +141,24 @@ class Server:
             except:
                 pass    # Ничего не делать, если какой-то клиент отключился
 
-            requests = self.read_requests(r)
-            self.write_responses(requests, w)
-
-    def mainloop(self):
-        while True:
-            self.get_connection()
-
-try:
-    addr = sys.argv[1]
-except IndexError:
-    addr = '127.0.0.1'
-try:
-    port = int(sys.argv[2])
-except IndexError:
-    port = 7777
-except ValueError:
-    print('Порт должен быть целым числом')
-    sys.exit(0)
+            requests = self.handler.read_requests(r, self.clients)
+            self.handler.write_responses(requests, w, self.clients)
 
 
-serv = Server(addr, port)
-serv.mainloop()
+if __name__ == '__main__':
+    try:
+        addr = sys.argv[1]
+    except IndexError:
+        addr = '127.0.0.1'
+    try:
+        port = int(sys.argv[2])
+    except IndexError:
+        port = 7777
+    except ValueError:
+        print('Порт должен быть целым числом')
+        sys.exit(0)
+
+    handler = Handler()
+    server = Server(handler)
+    server.bind(addr, port)
+    server.listen_forever()

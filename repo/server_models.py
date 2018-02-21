@@ -1,8 +1,7 @@
-import datetime
 import os
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, create_engine
+from sqlalchemy import Column, Integer, String, ForeignKey, create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 Base = declarative_base()
 
@@ -55,6 +54,3 @@ Session = sessionmaker(bind=engine)
 session = Session
 
 session = session
-
-
-
