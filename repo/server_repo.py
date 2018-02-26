@@ -63,3 +63,7 @@ class Repo:
                 contact = self.session.query(Client).filter(client.ClientId == contact_client.ContactId).first()
                 result.append(contact)
         return result
+
+    def get_clients(self):
+        """Получение всех клиентов"""
+        return self.session.query(Client).all()
