@@ -69,3 +69,27 @@ def del_contact():
 # связываем сигнал нажатия на кнопку и слот функцию удаления контакта
 window.pushButtonDelContect.clicked.connect(del_contact)
 
+
+def open_chat():
+    """Открытие модального чата (модальное для демонстрации)"""
+    # грузим QDialog чата
+    dialog = uic.loadUi('chat.ui')
+    # запускаем в модальном режиме
+    dialog.exec()
+
+
+# Пока мы не можем передать элемент на который нажали - сделать в следующий раз через наследование
+window.listWidgetContacts.itemDoubleClicked.connect(open_chat)
+
+# Контекстное меню при нажатии правой кнопки мыши (пока тестовый вариант для демонстрации)
+# Создаем на листе
+window.listWidgetContacts.setContextMenuPolicy(Qt.CustomContextMenu)
+window.listWidgetContacts.setContextMenuPolicy(Qt.ActionsContextMenu)
+quitAction = QtWidgets.QAction("Quit", None)
+quitAction.triggered.connect(app.quit)
+window.listWidgetContacts.addAction(quitAction)
+
+# рисуем окно
+window.show()
+# точка запуска приложения
+sys.exit(app.exec_())
