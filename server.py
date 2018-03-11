@@ -45,11 +45,14 @@ class Handler:
                         contacts = self.repo.get_contacts(action.account_name)
                         response = JimResponse(ACCEPTED, quantity=len(contacts))
                         send_message(sock, response.to_dict())
-                        # в цикле по контактам шлем сообщения
-                        for contact in contacts:
-                            message = JimContactList(contact.Name)
-                            print(message.to_dict())
-                            send_message(sock, message.to_dict())
+                        # # в цикле по контактам шлем сообщения
+                        # for contact in contacts:
+                        #     message = JimContactList(contact.Name)
+                        #     print(message.to_dict())
+                        #     send_message(sock, message.to_dict())
+                        contact_names = [contact.Name for contact in contacts]
+                        message = JimContactList(contact_names)
+                        send_message(sock, message.to_dict())
                     elif action.action == ADD_CONTACT:
                         user_id = action.user_id
                         username = action.account_name
@@ -121,28 +124,32 @@ class Server:
         # запускаем цикл обработки событиц много клиентов
         self.server.listen(15)
         self.server.settimeout(0.2)
-        try:
-            client, addr = self.server.accept()  # принятие запроса на соединение от клиента
-            presense = get_message(client)
-            response = self.handler.presense_response(presense)
-            send_message(client, response)
-        except OSError as e:
-            pass  # таймаут вышел
-        else:
-            print('Получен запрос на соединение с %s' % str(addr))
-            self.clients.append(client)
-        finally:
-            # проверка наличия событий ввода-вывода
-            wait = 0
-            r = []
-            w = []
-            try:
-                r, w, e = select.select(self.clients, self.clients, [], wait)
-            except:
-                pass    # Ничего не делать, если какой-то клиент отключился
 
-            requests = self.handler.read_requests(r, self.clients)
-            self.handler.write_responses(requests, w, self.clients)
+        while True:
+            try:
+                client, addr = self.server.accept()  # проверка подключений
+                presense = get_message(client)
+                response = self.handler.presense_response(presense)
+                send_message(client, response)
+            except OSError as e:
+                pass  # таймаут вышел
+            else:
+                print('Получен запрос на соединение с %s' % str(addr))
+                self.clients.append(client)
+            finally:
+                # проверка наличия событий ввода-вывода
+                wait = 0
+                r = []
+                w = []
+                try:
+                    r, w, e = select.select(self.clients, self.clients, [], wait)
+                except:
+                    pass    # Ничего не делать, если какой-то клиент отключился
+
+                # Получаем входные сообщения
+                requests = self.handler.read_requests(r, self.clients)
+                # Выполняем отправку входящих сообщений
+                self.handler.write_responses(requests, w, self.clients)
 
 
 if __name__ == '__main__':
