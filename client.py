@@ -107,6 +107,12 @@ class Client:
         response = self.request_queue.get()
         return response
 
+    def send_message(self, to, text):
+        # отправка сообщения
+        message = JimMessage(to, self.login, text)
+        # отправляем
+        send_message(self.sock, message.to_dict())
+
 #     def write_messages(self):
 #         """Клиент пишет сообщения в бесконечном цикле"""
 #         while True:

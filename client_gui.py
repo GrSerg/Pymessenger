@@ -41,7 +41,6 @@ def update_chat(data):
     """Отображение сообщения в истории"""
     try:
         msg = data
-        # требуется доработка
         window.listWidgetMessages.addItem(msg)
     except Exception as e:
         print(e)
@@ -118,25 +117,34 @@ def del_contact():
 # связываем сигнал нажатия на кнопку и слот функцию удаления контакта
 window.pushButtonDelContect.clicked.connect(del_contact)
 
+# отправка сообщения
+def send_message():
+    text = window.textEditMessage.toPlainText()
+    if text:
+        # получаем выделенного пользователя
+        selected_index = window.listWidgetContacts.currentIndex()
+        # получаем имя пользователя
+        user_name = selected_index.data()
+        # отправляем сообщение
+        client.send_message(user_name, text)
+        # будем выводить то что мы отправили в общем чате
+        msg = '{} >>> {}'.format(name, text)
+        window.listWidgetMessages.addItem(msg)
 
-def open_chat():
-    """Открытие модального чата (модальное для демонстрации)"""
-    # грузим QDialog чата
-    dialog = uic.loadUi('chat.ui')
-    # запускаем в модальном режиме
-    dialog.exec()
+
+# связываем сигнал нажатия на кнопку и слот функцию отправки сообщения
+window.PushButtonSend.clicked.connect(send_message)
 
 
-# Пока мы не можем передать элемент на который нажали - сделать в следующий раз через наследование
-window.listWidgetContacts.itemDoubleClicked.connect(open_chat)
-
-# Контекстное меню при нажатии правой кнопки мыши (пока тестовый вариант для демонстрации)
-# Создаем на листе
-# window.listWidgetContacts.setContextMenuPolicy(Qt.CustomContextMenu)
-# window.listWidgetContacts.setContextMenuPolicy(Qt.ActionsContextMenu)
-# quitAction = QtWidgets.QAction("Quit", None)
-# quitAction.triggered.connect(app.quit)
-# window.listWidgetContacts.addAction(quitAction)
+# def open_chat():
+#     """Открытие модального чата (модальное для демонстрации)"""
+#     # грузим QDialog чата
+#     dialog = uic.loadUi('chat.ui')
+#     # запускаем в модальном режиме
+#     dialog.exec()
+#
+# # Пока мы не можем передать элемент на который нажали - сделать в следующий раз через наследование
+# window.listWidgetContacts.itemDoubleClicked.connect(open_chat)
 
 # рисуем окно
 window.show()
