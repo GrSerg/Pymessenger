@@ -11,15 +11,17 @@ class Client(Base):
     __tablename__ = 'Client'
     ClientId = Column(Integer, primary_key=True)
     Name = Column(String, unique=True)
+    Password = Column(String)
     Info = Column(String, nullable=True)
 
-    def __init__(self, name, info=None):
+    def __init__(self, name, password, info=None):
         self.Name = name
+        self.Password = password
         if info:
             self.Info = info
 
     def __repr__(self):
-        return "<Client ('%s')>" % self.Name
+        return "<Client ('%s', '%s')>" % (self.Name, self.Password)
 
     def __eq__(self, other):
         # Клиенты равны, если равны их имена

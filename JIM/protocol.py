@@ -1,5 +1,6 @@
 import json
 import time as ctime
+import hashlib
 
 # Константы для работы JIM протокола
 
@@ -7,6 +8,7 @@ import time as ctime
 ACTION = 'action'
 USER = 'user'
 ACCOUNT_NAME = 'account_name'
+PASSWORD = 'password'
 USER_ID = 'user_id'
 RESPONSE = 'response'
 TIME = 'time'
@@ -16,6 +18,7 @@ QUANTITY = 'quantity'
 
 # Значения
 PRESENCE = 'presence'
+AUTHENTICATE = "authenticate"
 MSG = 'msg'
 TO = 'to'
 FROM = 'from'
@@ -26,21 +29,23 @@ ADD_CONTACT = 'add_contact'
 DEL_CONTACT = 'del_contact'
 
 # Кортеж возможных действий
-ACTIONS = (PRESENCE, MSG, GET_CONTACTS, CONTACT_LIST, ADD_CONTACT, DEL_CONTACT)
+ACTIONS = (AUTHENTICATE, PRESENCE, MSG, GET_CONTACTS, CONTACT_LIST, ADD_CONTACT, DEL_CONTACT)
 
 # Коды ответов (будут дополняться)
 BASIC_NOTICE = 100
 OK = 200
 ACCEPTED = 202
 WRONG_REQUEST = 400  # неправильный запрос/json объект
+WRONG_PASSWORD = 402
 SERVER_ERROR = 500
 
 # Кортеж из кодов ответов
-RESPONSE_CODES = (BASIC_NOTICE, OK, ACCEPTED, WRONG_REQUEST, SERVER_ERROR)
+RESPONSE_CODES = (BASIC_NOTICE, OK, ACCEPTED, WRONG_REQUEST, SERVER_ERROR, WRONG_PASSWORD)
 
 
 USERNAME_MAX_LENGTH = 25
 MESSAGE_MAX_LENGTH = 500
+PASSWORD_MAX_LENGTH = 10
 
 #############################
 # Функции для сообщений
@@ -96,6 +101,15 @@ def get_message(sock):
     response = bytes_to_dict(bresponse)
     # возвращаем словарь
     return response
+
+
+def get_hash(login, password):
+    """Создание hash для пароля"""
+    msg = hashlib.sha256()
+    msg.update(login.encode())
+    msg.update(password.encode())
+    h = msg.hexdigest()
+    return h
 
 #############################
 # Ошибки
@@ -224,9 +238,11 @@ class Jim:
             # действие должно быть в списке действий
             if action in ACTIONS:
                 if action == PRESENCE:
-                    return Jim.try_create(JimPresense, input_dict)
+                    return Jim.try_create(JimPresence, input_dict)
                 elif action == GET_CONTACTS:
                     return Jim.try_create(JimGetContacts, input_dict)
+                elif action == AUTHENTICATE:
+                    return Jim.try_create(JimAuthenticate, input_dict)
                 elif action == CONTACT_LIST:
                     return Jim.try_create(JimContactList, input_dict)
                 elif action == ADD_CONTACT:
@@ -328,17 +344,38 @@ class JimGetContacts(JimAction):
         return result
 
 
-class JimPresense(JimAction):
+class JimPresence(JimAction):
     # Имя пользователя ограничено 25 символов - используем дескриптор
     account_name = MaxLengthField('account_name', USERNAME_MAX_LENGTH)
+    # Пароль ограничен 10 символами - используем дескриптор
+    password = MaxLengthField('password', PASSWORD_MAX_LENGTH)
 
-    def __init__(self, account_name, time=None):
+    def __init__(self, account_name, password, time=None):
         self.account_name = account_name
-        super().__init__(GET_CONTACTS, time)
+        self.password = password
+        super().__init__(PRESENCE, time)
 
     def to_dict(self):
         result = super().to_dict()
         result[ACCOUNT_NAME] = self.account_name
+        result[PASSWORD] = self.password
+        return result
+
+class JimAuthenticate(JimAction):
+    # Имя пользователя ограничено 25 символов - используем дескриптор
+    account_name = MaxLengthField('account_name', USERNAME_MAX_LENGTH)
+    # Пароль ограничен 10 символами - используем дескриптор
+    password = MaxLengthField('password', PASSWORD_MAX_LENGTH)
+
+    def __init__(self, account_name, password, time=None):
+        self.account_name = account_name
+        self.password = password
+        super().__init__(AUTHENTICATE, time)
+
+    def to_dict(self):
+        result = super().to_dict()
+        result[ACCOUNT_NAME] = self.account_name
+        result[PASSWORD] = self.password
         return result
 
 

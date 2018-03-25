@@ -21,6 +21,13 @@ try:
     print(name)
 except IndexError:
     name = 'GuiGuest'
+try:
+    password = sys.argv[3]
+except IndexError:
+    if name == 'GuiGuest':
+        password = 'GuiGuest_pass'
+    else:
+        raise Exception('Неверный пароль')
 
 
 # Создаем приложение
@@ -28,7 +35,7 @@ app = QtWidgets.QApplication(sys.argv)
 # грузим главную форму
 window = uic.loadUi('main.ui')
 # создаем клиента на запись
-client = Client(name, addr, port)
+client = Client(name, password, addr, port)
 # получаем список контактов с сервера, которые лежат у нас - не надежные
 client.connect()
 # contact_list = client.get_contacts()
@@ -44,6 +51,7 @@ def update_chat(data):
         window.listWidgetMessages.addItem(msg)
     except Exception as e:
         print(e)
+
 
 # сигнал мы берем из нашего GuiReciever
 listener.gotData.connect(update_chat)
@@ -61,6 +69,7 @@ th.started.connect(listener.poll)
 th.start()
 
 contact_list = client.get_contacts()
+
 
 def load_contacts(contacts):
     """загрузка контактов в список"""
@@ -116,6 +125,7 @@ def del_contact():
 
 # связываем сигнал нажатия на кнопку и слот функцию удаления контакта
 window.pushButtonDelContect.clicked.connect(del_contact)
+
 
 # отправка сообщения
 def send_message():

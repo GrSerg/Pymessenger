@@ -81,19 +81,25 @@ class Handler:
                     # Отправляем ошибку и текст из ошибки
                     response = JimResponse(WRONG_REQUEST, error=str(e))
                     send_message(sock, response.to_dict())
-                except:  # Сокет недоступен, клиент отключился
+                except:
+                    # Сокет недоступен, клиент отключился
                     print('Клиент {} {} отключился'.format(sock.fileno(), sock.getpeername()))
                     sock.close()
                     all_clients.remove(sock)
 
-    def presense_response(self, presence_message):
+    def presence_response(self, presence_message):
         """Формирование ответа клиенту"""
         try:
-            presense = Jim.from_dict(presence_message)
-            username = presense.account_name
+            presence = Jim.from_dict(presence_message)
+            username = presence.account_name
+            password = presence.password
             # сохраняем пользователя в базу если его там еще нет
             if not self.repo.client_exist(username):
-                self.repo.add_client(username)
+                self.repo.add_client(username, password)
+            if not self.repo.password_correct(username, password):
+                response = JimResponse(WRONG_PASSWORD, error='Неверный пароль')
+                return response.to_dict()
+
         except Exception as e:
             # шлем код ошибки
             response = JimResponse(WRONG_REQUEST, error=str(e))
@@ -103,6 +109,27 @@ class Handler:
             response = JimResponse(OK)
             return response.to_dict()
 
+    # def authenticate_response(self, authenticate_message):
+    #     """Формирование ответа клиенту"""
+    #     try:
+    #         authenticate = Jim.from_dict(authenticate_message)
+    #         username = authenticate.account_name
+    #         password = authenticate.password
+    #         # сохраняем пользователя в базу если его там еще нет
+    #         if not self.repo.client_exist(username):
+    #             self.repo.add_client(username, password)
+    #         if not self.repo.password_correct(username, password):
+    #             response = JimResponse(WRONG_PASSWORD, error='Неверный пароль')
+    #             return response.to_dict()
+    #
+    #     except Exception as e:
+    #         # шлем код ошибки
+    #         response = JimResponse(WRONG_REQUEST, error=str(e))
+    #         return response.to_dict()
+    #     else:
+    #         # всё ок
+    #         response = JimResponse(OK)
+    #         return response.to_dict()
 
 class Server:
     """Класс сервера"""
@@ -144,7 +171,8 @@ class Server:
                 try:
                     r, w, e = select.select(self.clients, self.clients, [], wait)
                 except:
-                    pass    # Ничего не делать, если какой-то клиент отключился
+                    # Ничего не делать, если какой-то клиент отключился
+                    pass
 
                 # Получаем входные сообщения
                 requests = self.handler.read_requests(r, self.clients)

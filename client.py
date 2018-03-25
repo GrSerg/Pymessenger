@@ -12,8 +12,9 @@ log = Log(client_logger)
 class Client:
     """Клиент"""
 
-    def __init__(self, login, address, port):
+    def __init__(self, login, password, address, port):
         self.login = login
+        self.password = get_hash(login, password)
         self.addr = address
         self.port = port
         self.request_queue = Queue()
@@ -23,7 +24,7 @@ class Client:
         self.sock = socket(AF_INET, SOCK_STREAM)
         self.sock.connect((self.addr, self.port))
         # создаем и отправляем presense сообщение
-        presence = self.create_presense()
+        presence = self.create_presence()
         send_message(self.sock, presence)
         # Получаем ответ
         response = get_message(self.sock)
@@ -35,10 +36,16 @@ class Client:
         self.sock.close()
 
     @log
-    def create_presense(self):
-        """Формирование presense сообщения"""
-        jim_presense = JimPresense(self.login)
+    def create_presence(self):
+        """Формирование presence сообщения"""
+        jim_presense = JimPresence(self.login, self.password)
         message = jim_presense.to_dict()
+        return message
+
+    def create_authenticate(self):
+        """Сообщение аутентификации"""
+        jim_authenticate = JimAuthenticate(self.login, self.password)
+        message = jim_authenticate.to_dict()
         return message
 
     @log

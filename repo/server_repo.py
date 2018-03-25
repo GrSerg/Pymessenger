@@ -8,9 +8,9 @@ class Repo:
         # Запоминаем сессию, чтобы было удобно с ней работать
         self.session = session
 
-    def add_client(self, username, info=None):
+    def add_client(self, username, password, info=None):
         """Добавление клиента"""
-        new_item = Client(username, info)
+        new_item = Client(username, password, info)
         self.session.add(new_item)
         self.session.commit()
 
@@ -18,6 +18,12 @@ class Repo:
         """Проверка, что клиент уже есть"""
         result = self.session.query(Client).filter(Client.Name == username).count() > 0
         return result
+
+    def password_correct(self, username, password):
+        """Проверка правильности пароля"""
+        client = self.session.query(Client).filter(Client.Name == username).first()
+        if client.Password == password:
+            return True
 
     def get_client_by_username(self, username):
         """Получение клиента по имени"""
