@@ -1,8 +1,10 @@
 import sys
+
 from PyQt5 import QtWidgets, uic
-from PyQt5.QtCore import Qt, QThread, pyqtSlot
-from client import Client
-from handlers import GuiReceiver
+from PyQt5.QtCore import QThread, pyqtSlot
+
+from .client import Client
+from client.handlers import GuiReceiver
 
 # Получаем параметры скрипта
 try:
