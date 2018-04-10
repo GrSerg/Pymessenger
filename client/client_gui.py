@@ -129,6 +129,32 @@ def del_contact():
 window.pushButtonDelContect.clicked.connect(del_contact)
 
 
+# форматирование текста жирным
+def action_bold():
+    cursor = window.textEditMessage.textCursor()
+    text = cursor.selectedText()
+    window.textEditMessage.insertHtml('<b>%s</b>' % text)
+
+
+# форматирование текста курсивом
+def action_italic():
+    cursor = window.textEditMessage.textCursor()
+    text = cursor.selectedText()
+    window.textEditMessage.insertHtml('<i>%s</i>' % text)
+
+
+# форматирование текста подчеркиванием
+def action_underlined():
+    cursor = window.textEditMessage.textCursor()
+    text = cursor.selectedText()
+    window.textEditMessage.insertHtml('<u>%s</u>' % text)
+
+# связываем сигнал нажатия на кнопку и слот функцию форматирования
+window.pushButtonActionBold.clicked.connect(action_bold)
+window.pushButtonActionItalic.clicked.connect(action_italic)
+window.pushButtonActionUnderlined.clicked.connect(action_underlined)
+
+
 # отправка сообщения
 def send_message():
     text = window.textEditMessage.toPlainText()

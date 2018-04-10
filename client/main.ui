@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>452</width>
-    <height>334</height>
+    <height>372</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -108,21 +108,11 @@
      </rect>
     </property>
    </widget>
-   <widget class="QTextEdit" name="textEditMessage">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>290</y>
-      <width>311</width>
-      <height>31</height>
-     </rect>
-    </property>
-   </widget>
    <widget class="QPushButton" name="PushButtonSend">
     <property name="geometry">
      <rect>
-      <x>340</x>
-      <y>290</y>
+      <x>330</x>
+      <y>320</y>
       <width>101</width>
       <height>31</height>
      </rect>
@@ -130,6 +120,71 @@
     <property name="text">
      <string>Send</string>
     </property>
+   </widget>
+   <widget class="QWidget" name="">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>285</y>
+      <width>311</width>
+      <height>71</height>
+     </rect>
+    </property>
+    <layout class="QGridLayout" name="gridLayout_2">
+     <item row="0" column="0">
+      <layout class="QGridLayout" name="gridLayout">
+       <item row="0" column="0">
+        <widget class="QPushButton" name="pushButtonActionBold">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="icon">
+          <iconset>
+           <normaloff>D:/Download_firefox/selectedformat/selectedformat/b.jpg</normaloff>D:/Download_firefox/selectedformat/selectedformat/b.jpg</iconset>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QPushButton" name="pushButtonActionItalic">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="icon">
+          <iconset>
+           <normaloff>D:/Download_firefox/selectedformat/selectedformat/i.jpg</normaloff>D:/Download_firefox/selectedformat/selectedformat/i.jpg</iconset>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="2">
+        <widget class="QPushButton" name="pushButtonActionUnderlined">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="icon">
+          <iconset>
+           <normaloff>D:/Download_firefox/selectedformat/selectedformat/u.jpg</normaloff>D:/Download_firefox/selectedformat/selectedformat/u.jpg</iconset>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item row="0" column="1">
+      <spacer name="horizontalSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>188</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item row="1" column="0" colspan="2">
+      <widget class="QTextEdit" name="textEditMessage"/>
+     </item>
+    </layout>
    </widget>
   </widget>
  </widget>
