@@ -149,6 +149,7 @@ def action_underlined():
     text = cursor.selectedText()
     window.textEditMessage.insertHtml('<u>%s</u>' % text)
 
+
 # связываем сигнал нажатия на кнопку и слот функцию форматирования
 window.pushButtonActionBold.clicked.connect(action_bold)
 window.pushButtonActionItalic.clicked.connect(action_italic)

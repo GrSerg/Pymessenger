@@ -18,6 +18,6 @@ setup(
     python_requires='>=3.5',
     install_requires=[
         'PyQt5==5.10.1',
-        'SQLAlchemy==1.2.5',
+        'SQLAlchemy==1.2.6',
     ],
 )
