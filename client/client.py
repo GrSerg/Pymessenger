@@ -14,7 +14,7 @@ class Client:
 
     def __init__(self, login, password, address, port):
         self.login = login
-        self.password = get_hash(login, password)
+        self.password = password        # get_hash(login, password)
         self.addr = address
         self.port = port
         self.request_queue = Queue()

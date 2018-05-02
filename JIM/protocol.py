@@ -45,7 +45,7 @@ RESPONSE_CODES = (BASIC_NOTICE, OK, ACCEPTED, WRONG_REQUEST, SERVER_ERROR, WRONG
 
 USERNAME_MAX_LENGTH = 25
 MESSAGE_MAX_LENGTH = 500
-PASSWORD_MAX_LENGTH = 10
+PASSWORD_MAX_LENGTH = 20
 
 #############################
 # Функции для сообщений
@@ -361,10 +361,11 @@ class JimPresence(JimAction):
         result[PASSWORD] = self.password
         return result
 
+
 class JimAuthenticate(JimAction):
     # Имя пользователя ограничено 25 символов - используем дескриптор
     account_name = MaxLengthField('account_name', USERNAME_MAX_LENGTH)
-    # Пароль ограничен 10 символами - используем дескриптор
+    # Пароль ограничен 50 символами - используем дескриптор
     password = MaxLengthField('password', PASSWORD_MAX_LENGTH)
 
     def __init__(self, account_name, password, time=None):

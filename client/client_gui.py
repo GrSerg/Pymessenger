@@ -3,8 +3,8 @@ import sys
 from PyQt5 import QtWidgets, uic
 from PyQt5.QtCore import QThread, pyqtSlot
 
-from .client import Client
-from client.handlers import GuiReceiver
+from client import Client
+from handlers import GuiReceiver
 
 # Получаем параметры скрипта
 try:
@@ -27,7 +27,7 @@ try:
     password = sys.argv[3]
 except IndexError:
     if name == 'GuiGuest':
-        password = 'GuiGuest_pass'
+        password = 'GuiGuest_pass1'
     else:
         raise Exception('Неверный пароль')
 

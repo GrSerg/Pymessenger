@@ -131,6 +131,7 @@ class Handler:
     #         response = JimResponse(OK)
     #         return response.to_dict()
 
+
 class Server:
     """Класс сервера"""
 
